@@ -1,0 +1,13 @@
+{
+  "port": 8000,
+  "upload_folder": "D:/AAAstation",
+  "max_content_length": 1000,
+  "debug": false,
+  "colors": {
+    "primary": "#3498db",
+    "secondary": "#95a5a6",
+    "background": "#f5f7fa",
+    "text": "#333",
+    "card": "white"
+  }
+}

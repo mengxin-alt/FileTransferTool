@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件传输工具</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        :root {
+            --primary-color: {{ colors.get('primary', '#3498db') }};
+            --secondary-color: {{ colors.get('secondary', '#95a5a6') }};
+            --background-color: {{ colors.get('background', '#f5f7fa') }};
+            --text-color: {{ colors.get('text', '#333') }};
+            --card-color: {{ colors.get('card', 'white') }};
+        }
+        
+        /* 版本信息样式 */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: var(--secondary-color);
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>📂 文件传输工具</h1>
+            <p>在电脑和手机之间轻松传输文件</p>
+            <div class="header-actions">
+                <a href="/dashboard" class="btn btn-secondary">服务器监控</a>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- 上传区域 -->
+            <section class="upload-section">
+                <div class="upload-box" id="uploadBox">
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <p>点击或拖拽文件到此处上传</p>
+                    <input type="file" id="fileInput" multiple style="display: none;">
+                    <button class="btn btn-primary" id="browseBtn">选择文件</button>
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress" id="progress"></div>
+                    </div>
+                    <p id="progressText">上传中... 0%</p>
+                </div>
+            </section>
+
+            <!-- 文件列表 -->
+            <section class="files-section">
+                <div class="section-header">
+                    <h2>文件列表</h2>
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="搜索文件名..." class="search-input">
+                        <button class="btn btn-secondary" id="refreshBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+                <div class="files-list" id="filesList">
+                    <div class="empty-state">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="9" y1="21" x2="9" y2="9"></line>
+                        </svg>
+                        <p>暂无文件，点击上方上传</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 图片查看器模态框 -->
+        <div id="imageViewer" class="image-viewer">
+            <div class="image-viewer-content">
+                <span class="close-btn" onclick="closeImageViewer()">&times;</span>
+                <img id="viewerImage" src="" alt="图片预览">
+                <div class="image-info"><span id="imageName"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 版本信息 -->
+    <footer class="footer">
+        <p>有问题？联系我们：3438978674@qq.com</p>
+        <p>版本信息: v1.0.0</p>
+    </footer>
+
+    <script>
+        // 将脚本包裹在一个立即执行函数中
+        (function() {
+            // 所有函数定义都放在这里
+            
+            // 带搜索功能的文件加载
+            async function loadFiles(searchQuery = '') {
+                console.log('loadFiles函数被调用，searchQuery:', searchQuery);
+                try {
+                    const url = searchQuery ? `/files?query=${encodeURIComponent(searchQuery)}` : '/files';
+                    console.log('请求的URL:', url);
+                    const response = await fetch(url);
+                    const result = await response.json();
+                    console.log('服务器返回的数据:', result);
+
+                    // 检查关键DOM元素是否存在
+                    const filesList = document.getElementById('filesList');
+                    if (!filesList) {
+                        console.error('filesList元素不存在！');
+                        return;
+                    }
+
+                    if (result.files.length === 0) {
+                        filesList.innerHTML = `
+                            <div class="empty-state">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                                    <line x1="9" y1="21" x2="9" y2="9"></line>
+                                </svg>
+                                <p>${searchQuery ? '没有找到匹配的文件' : '暂无文件，点击上方上传'}</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    filesList.innerHTML = result.files.map(file => {
+                        const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(file.name);
+                        return `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <div class="file-icon">
+                                    ${isImage ? `
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                    ` : `
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                        </svg>
+                                    `}
+                                </div>
+                                <div class="file-details">
+                                    <div class="file-name">${file.name.split('_').slice(1).join('_')}</div>
+                                    <div class="file-meta">
+                                        <span>${formatFileSize(file.size)}</span>
+                                        <span>${file.modified}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                ${isImage ? `
+                                    <button class="btn btn-icon" onclick="viewImage('${file.name}')" title="预览">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-icon" onclick="downloadFile('${file.name}')" title="下载">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-icon" onclick="deleteFile('${file.name}')" title="删除">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    }).join('');
+                } catch (error) {
+                    showMessage('加载文件列表失败: ' + error.message, 'error');
+                }
+            }
+
+            // 下载文件
+            window.downloadFile = function(filename) {
+                window.location.href = `/download/${filename}`;
+            }
+
+            // 删除文件
+            window.deleteFile = async function(filename) {
+                if (confirm('确定要删除这个文件吗？')) {
+                    try {
+                        const response = await fetch(`/delete/${filename}`, {method: 'DELETE'});
+                        const result = await response.json();
+                        if (response.ok) {
+                            showMessage('文件删除成功', 'success');
+                            loadFiles();
+                        } else {
+                            showMessage('删除失败: ' + result.error, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('删除失败: ' + error.message, 'error');
+                    }
+                }
+            }
+
+            // 查看图片
+            window.viewImage = function(filename) {
+                const imageViewer = document.getElementById('imageViewer');
+                const viewerImage = document.getElementById('viewerImage');
+                const imageName = document.getElementById('imageName');
+                
+                viewerImage.src = `/download/${filename}`;
+                imageName.textContent = filename.split('_').slice(1).join('_');
+                imageViewer.style.display = 'flex';
+            }
+
+            // 关闭图片查看器
+            window.closeImageViewer = function() {
+                const imageViewer = document.getElementById('imageViewer');
+                imageViewer.style.display = 'none';
+            }
+
+            // 格式化文件大小
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // 显示消息
+            function showMessage(message, type) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message message-${type}`;
+                messageDiv.textContent = message;
+                document.body.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    messageDiv.classList.add('show');
+                }, 10);
+                
+                setTimeout(() => {
+                    messageDiv.classList.remove('show');
+                    setTimeout(() => {
+                        messageDiv.remove();
+                    }, 300);
+                }, 3000);
+            }
+
+            // 确保DOM元素已经加载完成
+            const waitForDOM = setInterval(function() {
+                // 检查关键DOM元素是否存在
+                const filesList = document.getElementById('filesList');
+                const searchInput = document.getElementById('searchInput');
+                const refreshBtn = document.getElementById('refreshBtn');
+                const uploadBox = document.getElementById('uploadBox');
+                const fileInput = document.getElementById('fileInput');
+                const browseBtn = document.getElementById('browseBtn');
+                
+                if (filesList && searchInput && refreshBtn && uploadBox && fileInput && browseBtn) {
+                    clearInterval(waitForDOM);
+                    console.log('所有DOM元素加载完成，初始化功能...');
+                    
+                    // 绑定事件监听器
+                    
+                    // 点击选择文件
+                    browseBtn.addEventListener('click', () => {
+                        fileInput.click();
+                    });
+
+                    // 拖拽上传
+                    uploadBox.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        uploadBox.classList.add('dragover');
+                    });
+
+                    uploadBox.addEventListener('dragleave', () => {
+                        uploadBox.classList.remove('dragover');
+                    });
+
+                    uploadBox.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        uploadBox.classList.remove('dragover');
+                        if (e.dataTransfer.files.length > 0) {
+                            uploadFiles(Array.from(e.dataTransfer.files));
+                        }
+                    });
+
+                    // 文件选择变化
+                    fileInput.addEventListener('change', () => {
+                        if (fileInput.files.length > 0) {
+                            uploadFiles(Array.from(fileInput.files));
+                        }
+                    });
+
+                    // 刷新文件列表
+                    refreshBtn.addEventListener('click', loadFiles);
+
+                    // 抖动搜索功能
+                    let searchTimeout;
+                    searchInput.addEventListener('input', (e) => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const query = e.target.value.trim();
+                            loadFiles(query);
+                        }, 300); // 300毫秒延迟，实现抖动搜索
+                    });
+                    
+                    // 立即加载文件列表
+                    console.log('调用loadFiles()加载文件列表...');
+                    loadFiles();
+                }
+            }, 100); // 每100毫秒检查一次DOM元素
+            
+            // 上传文件
+            async function uploadFiles(files) {
+                const uploadProgress = document.getElementById('uploadProgress');
+                const progress = document.getElementById('progress');
+                const progressText = document.getElementById('progressText');
+                
+                for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    uploadProgress.style.display = 'block';
+                    progress.style.width = '0%';
+                    progressText.textContent = '上传中... 0%';
+
+                    await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                                progress.style.width = percentComplete + '%';
+                                progressText.textContent = '上传中... ' + percentComplete + '%';
+                            }
+                        });
+                        
+                        xhr.addEventListener('load', () => {
+                            if (xhr.status === 201) {
+                                const result = JSON.parse(xhr.responseText);
+                                showMessage('文件上传成功: ' + file.name, 'success');
+                                loadFiles();
+                                resolve(result);
+                            } else {
+                                const error = JSON.parse(xhr.responseText);
+                                showMessage('上传失败: ' + error.error, 'error');
+                                reject(error);
+                            }
+                        });
+                        
+                        xhr.addEventListener('error', () => {
+                            showMessage('上传失败: 网络错误', 'error');
+                            reject(new Error('网络错误'));
+                        });
+                        
+                        xhr.addEventListener('loadend', () => {
+                            uploadProgress.style.display = 'none';
+                        });
+                        
+                        xhr.open('POST', '/upload');
+                        xhr.send(formData);
+                    });
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
