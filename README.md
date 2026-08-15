@@ -2,7 +2,7 @@
 
 > 基于 Flask + Tkinter 的双进程桌面文件传输服务，让电脑与手机/其他设备之间通过浏览器轻松互传文件。
 >
-> **版本**：v1.0.0 ｜ **联系**：3438978674@qq.com
+> **版本**：v1.0.1 ｜ **联系**：3438978674@qq.com
 
 ---
 
@@ -21,7 +21,6 @@
 - [十一、打包发布](#十一打包发布)
 - [十二、常见问题](#十二常见问题)
 - [十三、已知限制与安全提示](#十三已知限制与安全提示)
-- [十四、面试要点速查](#十四面试要点速查)
 
 ---
 
@@ -32,7 +31,7 @@
 1. **桌面 GUI 控制面板**（Tkinter）：用户可视化地启动/停止服务、查看二维码、配置参数、查看日志。
 2. **Flask Web 服务器**：手机或其他电脑通过浏览器访问即可上传/下载/删除文件。
 
-两者通过`subprocess`子进程方式解耦：GUI不阻塞，Flask崩溃可独立重启，可打包为单文件exe分发。
+两者通过 `subprocess` 子进程方式解耦：GUI 不阻塞，Flask 崩溃可独立重启，可打包为单文件 exe 分发。
 
 ---
 
@@ -45,6 +44,7 @@
 - ✅ 5 套主题配色（default / dark / vibrant / minimal / pastel）
 - ✅ 实时日志查看器：操作日志 + 访问日志双通道切换、级别过滤、时间范围过滤、关键词搜索高亮、自动刷新、一键导出
 - ✅ 完整配置管理：端口、上传目录、文件大小限制、调试模式
+- ✅ 「帮助 → 关于」打开服务器监控仪表盘（含服务运行状态前置检查）
 
 ### 🌐 Web 传输页
 - ✅ 拖拽 / 点击双通道上传
@@ -65,6 +65,7 @@
 - ✅ 多编码降级读取日志（UTF-8 → GBK → Latin-1）
 - ✅ IP 获取三路兜底（psutil → socket → UDP connect）
 - ✅ 特权端口管理员权限前置提醒
+- ✅ dashboard 入口防御性检查（服务未启动时提示并引导，IP 为空时用 127.0.0.1 兜底）
 
 ---
 
@@ -136,6 +137,8 @@ python app.py
 python app.py --run-server
 ```
 
+> ⚠️ **注意**：直接运行脚本即可（`python app.py`），**不要**使用 `python -m .\app` 这类带相对路径的 `-m` 写法，Python 会报 `Relative module names not supported`。
+
 ### 使用流程
 
 1. 运行 `python app.py` 启动控制面板
@@ -143,6 +146,7 @@ python app.py --run-server
 3. 点击「启动服务」
 4. 手机扫描二维码或浏览器访问显示的地址
 5. 在 Web 页面上传 / 下载 / 删除文件
+6. 需要查看监控：点「帮助 → 关于」打开 dashboard（需服务已启动）
 
 ---
 
@@ -191,7 +195,15 @@ FileTransferTool/
 - **配置**：端口 / 上传目录 / 文件大小 / 调试模式 + 5 套主题
 - **日志**：操作日志 + 访问日志切换、过滤、搜索、导出
 
-### 7.4 进程回收机制 ([app.py:1481-1663](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1481-L1663))
+### 7.4 dashboard 入口 ([app.py:1100-1123](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1100-L1123))
+
+「帮助 → 关于」通过 `webbrowser.open` 打开 `/dashboard` 路由。该方法包含完整防御逻辑：
+
+- **服务状态前置检查**：未启动服务时弹出提示并自动切换到「服务控制」标签页
+- **IP 兜底**：`get_all_local_ips()` 返回空时用 `127.0.0.1` 兜底，避免变量未定义崩溃
+- **异常捕获**：端口非法、浏览器打开失败等均给出友好提示并写日志
+
+### 7.5 进程回收机制 ([app.py:1481-1663](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1481-L1663))
 
 停止服务的 4 层防御：
 
@@ -200,11 +212,11 @@ FileTransferTool/
 3. 主进程 `terminate` + 超时 `kill`
 4. 扫描所有监听该端口的进程并全局 `kill`（解决 Werkzeug reloader worker 泄漏）
 
-### 7.5 二维码生成 ([app.py:1339-1366](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1339-L1366))
+### 7.6 二维码生成 ([app.py:1339-1366](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1339-L1366))
 
 使用 `qrcode.QRCode` 生成访问 URL 二维码，`box_size=5, border=1`，resize 到 120×120 后通过 `ImageTk.PhotoImage` 显示。
 
-### 7.6 多策略 IP 获取 ([app.py:1368-1420](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1368-L1420))
+### 7.7 多策略 IP 获取 ([app.py:1368-1420](file:///e:/DeskTop/modify_ai/FileTransferTool/app.py#L1368-L1420))
 
 | 优先级 | 方法 | 优点 | 缺点 |
 |--------|------|------|------|
@@ -362,6 +374,14 @@ GUI 日志查看器已内置 UTF-8 / GBK / Latin-1 三编码降级读取。若�
 
 当前二维码仅生成第一个 IP。如果电脑同时连了有线和 Wi-Fi，但手机连的是 Wi-Fi，可能扫到的是有线 IP。临时解决：在「访问地址」区域手动复制正确的 IP。改进方向：二维码改为中转 HTML 页，列出所有 IP 供用户选择。
 
+### Q6：点「帮助 → 关于」打不开 dashboard？
+
+dashboard 由 Flask 的 `/dashboard` 路由提供，**必须先启动服务**。当前版本已加入前置检查：若服务未启动，会弹出提示并自动切换到「服务控制」标签页引导你启动。请先点「启动服务」，再点「帮助 → 关于」。
+
+### Q7：运行报 `Relative module names not supported`？
+
+使用了错误的 `-m` 写法（如 `python -m .\app`）。正确方式是直接运行脚本：`python app.py`，或用合法模块名：`python -m app`（不带路径前缀和 `.py` 后缀）。
+
 ---
 
 ## 十三、已知限制与安全提示
@@ -390,7 +410,7 @@ GUI 日志查看器已内置 UTF-8 / GBK / Latin-1 三编码降级读取。若�
 - `/files` 接口每次全量扫描目录，文件数超过 10 万时可能卡顿
 - 当前不支持断点续传 / 分片上传
 
-
+---
 
 ## 📄 License
 
@@ -399,8 +419,8 @@ GUI 日志查看器已内置 UTF-8 / GBK / Latin-1 三编码降级读取。若�
 ## 📬 联系方式
 
 - 邮箱：3438978674@qq.com
-- 版本：v1.0.0
+- 版本：v1.0.1
 
 ---
 
-> 📝 本文档由项目解析自动生成，最后更新：2026-08-15
+> 📝 最后更新：2026-08-15
