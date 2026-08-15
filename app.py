@@ -1099,17 +1099,28 @@ class ServerGUI:
     
     def show_about(self):
         # 跳转到dashboard.html界面
-        port = int(self.port_display_var.get())
-        config['port'] = port
-        # 获取所有本地IP地址
-        local_ips = self.get_all_local_ips()
-        
-        # 更新访问地址
-        if local_ips:
-            main_ip = local_ips[0]
+        # 前置检查：dashboard 由 Flask 的 /dashboard 路由提供，必须先启动服务
+        if not self.server_running or self.server_process is None:
+            messagebox.showwarning(
+                "提示",
+                "服务器尚未启动，无法打开监控面板。\n请先在「服务控制」标签页点击「启动服务」。"
+            )
+            self.notebook.select(self.control_frame)
+            return
+
+        try:
+            port = int(self.port_display_var.get())
+            config['port'] = port
+            # 获取所有本地IP地址，为空时用 127.0.0.1 兜底，避免 url 未定义导致崩溃
+            local_ips = self.get_all_local_ips()
+            main_ip = local_ips[0] if local_ips else '127.0.0.1'
             url = "http://{}:{}/dashboard".format(main_ip, port)
-        webbrowser.open(url)
-        # webbrowser.open("http://10.81.85.54:8993/dashboard")
+            webbrowser.open(url)
+        except ValueError:
+            messagebox.showerror("错误", "端口号无效，无法打开监控面板！")
+        except Exception as e:
+            logger.error("打开监控面板失败: %s", str(e))
+            messagebox.showerror("错误", "打开监控面板失败: {}".format(str(e)))
         
     def show_config(self):
         # 切换到配置标签页
